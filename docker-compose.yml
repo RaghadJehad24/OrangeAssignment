@@ -1,0 +1,75 @@
+version: "3.8"
+
+services:
+  localstack:
+    image: localstack/localstack:3.4.0
+    container_name: datalake_localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3
+    volumes:
+      - ./volume/localstack:/var/lib/localstack
+      - ./infrastructure:/etc/localstack/init/ready.d
+    networks:
+      - app-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: dwh_postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin123
+      - POSTGRES_DB=sales_dwh
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d sales_dwh"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: api_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=postgres
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    volumes:
+      - ./infrastructure:/app/infrastructure
+      - ./data_pipeline:/app/data_pipeline
+      - ./sales.csv:/app/sales.csv
+    networks:
+      - app-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ui_frontend
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://backend:8000
+    networks:
+      - app-network
+    depends_on:
+      - backend
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  pgdata:
