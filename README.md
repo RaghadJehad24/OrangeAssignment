@@ -134,8 +134,3 @@ To complete this assessment within a prototyping timeframe, certain architectura
 4. **Semantic Ambiguity (Business Rules):**
    - _Observation:_ The LLM maps terms differently based on language context (e.g., "least ordered" -> `COUNT()`, "least selling" -> `SUM()`).
    - _Production:_ Implement a semantic layer (like `dbt`) or inject strict corporate terminology definitions into the LLM system prompt to ensure Data Governance and metric consistency.
-
-```
-
----
-```
