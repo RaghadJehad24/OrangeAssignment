@@ -1,11 +1,6 @@
 .env
-
 env/
-
-
 .Python
-
 volume/
 *.csv
-
 *.log
