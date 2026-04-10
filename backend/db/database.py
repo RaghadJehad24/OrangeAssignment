@@ -4,8 +4,14 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.pool import QueuePool
 
 logger = logging.getLogger(__name__)
+DB_HOST = os.getenv("DB_HOST", "postgres")
+DB_PORT = os.getenv("DB_PORT", "5432")
+DB_USER = os.getenv("DB_USER", "admin")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "admin123")
+DB_NAME = os.getenv("DB_NAME", "sales_dwh")
 
-DB_URL = os.getenv("DB_HOST", "postgresql://admin:admin123@postgres:5432/sales_dwh")
+DB_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+# DB_URL = os.getenv("DB_HOST_URL", "postgresql://admin:admin123@postgres:5432/sales_dwh")
 
 engine = create_engine(
     DB_URL,
@@ -16,6 +22,7 @@ engine = create_engine(
     pool_pre_ping=True  
 )
 
+ 
 def execute_safe_query(sql_query: str):
     """Execute SQL safely with timeout + read-only enforcement"""
 
