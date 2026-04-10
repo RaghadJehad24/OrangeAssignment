@@ -21,6 +21,11 @@ def is_sql_safe(sql_query: str) -> bool:
         r"\bINSERT\b",
         r"\bALTER\b",
         r"\bTRUNCATE\b"
+        r"\bCREATE\b",    
+        r"\bGRANT\b",     
+        r"\bREVOKE\b",    
+        r"\bEXEC\b",      
+        r"\bCAST\b",  
     ]
     upper_query = sql_query.upper()
     for keyword in dangerous_keywords:

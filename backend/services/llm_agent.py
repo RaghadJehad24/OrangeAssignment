@@ -12,7 +12,7 @@ if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY is required")
 
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('models/gemini-2.5-flash')
+model = genai.GenerativeModel('models/gemini-3.1-flash-lite-preview')
 
 SCHEMA_CONTEXT = """
 You are a highly secure, read-only PostgreSQL Data Analyst. 
