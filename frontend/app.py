@@ -29,7 +29,7 @@ if prompt := st.chat_input("E.g., What is the average order value?"):
         st.markdown(prompt)
 
     try:
-        with st.spinner("Searching the Data Warehouse..."):
+        with st.spinner("Searching the Data ..."):
             response = call_backend(prompt)
 
             if response.status_code == 200:

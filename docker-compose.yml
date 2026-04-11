@@ -10,9 +10,14 @@ services:
       - SERVICES=s3
     volumes:
       - ./volume/localstack:/var/lib/localstack
-      - ./infrastructure:/etc/localstack/init/ready.d
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 10s
 
   postgres:
     image: postgres:15-alpine
@@ -31,7 +36,38 @@ services:
       test: ["CMD-SHELL", "pg_isready -U admin -d sales_dwh"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 5s
+
+  etl_runner:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: etl_runner
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-admin}:${DB_PASSWORD:-admin123}@postgres:5432/${DB_NAME:-sales_dwh}
+      - S3_ENDPOINT=http://localstack:4566
+      - S3_BUCKET_NAME=retail-data-lake
+    volumes:
+      - ./data_pipeline:/app/data_pipeline
+      - ./data:/app/data
+      - ./infrastructure:/app/infrastructure
+    networks:
+      - app-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        echo '📤 Uploading data to S3...' &&
+        python /app/infrastructure/init_s3.py &&
+        echo '🚀 Running ETL pipeline...' &&
+        python /app/data_pipeline/etl_script.py &&
+        echo '✅ ETL complete.'
+      "
+    restart: "no"
 
   backend:
     build:
@@ -47,10 +83,6 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-admin123}
       - DB_NAME=${DB_NAME:-sales_dwh}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-    volumes:
-      - ./infrastructure:/app/infrastructure
-      - ./data_pipeline:/app/data_pipeline
-      - ./data:/app/data
     networks:
       - app-network
     depends_on:
