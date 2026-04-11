@@ -23,7 +23,6 @@ services:
       - POSTGRES_USER=${DB_USER:-admin}
       - POSTGRES_PASSWORD=${DB_PASSWORD:-admin123}
       - POSTGRES_DB=${DB_NAME:-sales_dwh}
-      - POSTGRES_INITDB_ARGS=-c shared_buffers=256MB -c max_connections=200
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
@@ -51,7 +50,7 @@ services:
     volumes:
       - ./infrastructure:/app/infrastructure
       - ./data_pipeline:/app/data_pipeline
-      - ./sales.csv:/app/sales.csv
+        - ./data/sales.csv:/app/data/sales.csv
     networks:
       - app-network
     depends_on:

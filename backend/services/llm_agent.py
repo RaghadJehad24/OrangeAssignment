@@ -1,10 +1,10 @@
 import os
 import logging
 import re
+import json
 import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
-
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
@@ -15,89 +15,69 @@ genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('models/gemini-3.1-flash-lite-preview')
 
 SCHEMA_CONTEXT = """
-You are a highly secure, read-only PostgreSQL Data Analyst. 
-Your job is to translate user natural language questions (in English or Arabic) into valid, optimized PostgreSQL `SELECT` queries.
+Role: You are a friendly, professional "Sales Intelligence Partner".
+Languages: You are fully bilingual. You MUST reply in the same language the user speaks (Arabic or English).
 
-We have a Star Schema Data Warehouse with the following tables:
+Behavior & Persona:
+1. If the user greets you (e.g., "Hi", "مرحبا", "مين انت"), respond warmly in their language. Explain that you are a sales assistant helping track performance, customers, and revenues. Do NOT generate SQL for greetings.
+2. If the user asks a business/data question (e.g., "What are our top sales?", "أعطني أفضل المنتجات مبيعاً"), you MUST output ONLY a PostgreSQL `SELECT` or `WITH` query. Do NOT add conversation, markdown, or explanations. Just the code.
+3. Never hallucinate data.
+
+Data Warehouse Schema:
 1. dim_date(date_id, date, year, month, day)
 2. dim_customer(customer_key, customer_id, customer_name, segment)
 3. dim_product(product_key, product_id, product_name, category, sub_category)
 4. dim_location(location_key, postal_code, country, city, state, region)
 5. fact_sales(row_id, order_id, date_id, customer_key, product_key, location_key, sales)
 
-CRITICAL RULES:
-1. Even if the user asks in Arabic, the SQL must use the English table and column names defined above.
-2. Output ONLY the raw SQL query. Do not add markdown or conversational text.
-3. NEVER generate DROP, DELETE, UPDATE, INSERT, ALTER, or TRUNCATE.
-4. ALWAYS use Common Table Expressions (WITH clause) instead of nested subqueries for complex calculations.
-5. If joining multiple tables, always use the surrogate keys (date_id, customer_key, product_key, location_key).
-
-EXAMPLES:
-
-User: "What is the average total revenue for each month of the year?"
-SQL: 
-WITH monthly_sales AS (
-    SELECT d.year, d.month, SUM(f.sales) AS total_revenue
-    FROM fact_sales f
-    JOIN dim_date d ON f.date_id = d.date_id
-    GROUP BY d.year, d.month
-)
-SELECT month, AVG(total_revenue) AS average_revenue
-FROM monthly_sales
-GROUP BY month
-ORDER BY month;
-
-User: "ما هو متوسط إجمالي قيمة الطلب؟"
-SQL: 
-WITH order_totals AS (
-    SELECT order_id, SUM(sales) AS total_order_value
-    FROM fact_sales
-    GROUP BY order_id
-)
-SELECT AVG(total_order_value) AS average_order_value
-FROM order_totals;
-
-User: "أعطني أفضل 5 منتجات مبيعاً"
-SQL:
-SELECT p.product_name, SUM(f.sales) as total_sales
-FROM fact_sales f
-JOIN dim_product p ON f.product_key = p.product_key
-GROUP BY p.product_name
-ORDER BY total_sales DESC
-LIMIT 5;
+Strict SQL Rules:
+- Output ONLY the raw SQL code.
+- Always use English table/column names in the SQL, even if the user asks in Arabic.
+- Use surrogate keys for JOINs (e.g., customer_key).
 """
 
-
-async def generate_sql_from_prompt(user_question: str) -> str:
+async def generate_sql_or_chat(user_question: str) -> str:
+ 
     try:
-        if "SCHEMA_CONTEXT" not in globals():
-            raise ValueError("SCHEMA_CONTEXT is not defined")
-
-        prompt = f"{SCHEMA_CONTEXT}\n\nUser Question:\n{user_question}\n\nSQL:"
-
+        prompt = f"{SCHEMA_CONTEXT}\n\nUser Question: {user_question}\nResponse:"
         response = await model.generate_content_async(prompt)
 
         if not response or not response.text:
-            raise ValueError("Empty response from LLM")
+            return "عذراً، لم أستطع فهم الطلب."
 
         raw_text = response.text.strip()
-        logger.info(f"AI Raw Output:\n{raw_text}")
-
-        clean_sql = re.sub(r"```sql|```", "", raw_text).strip()
-        clean_sql = re.sub(r"http\S+", "", clean_sql).strip()
-
-        lines = clean_sql.splitlines()
-        sql_lines = [
-            line for line in lines
-            if not line.lower().startswith(("user:", "sql:", "explanation:"))
-        ]
-        clean_sql = "\n".join(sql_lines).strip()
-
-        if clean_sql.endswith(";"):
-            clean_sql = clean_sql[:-1]
-
-        return clean_sql
+        clean_text = re.sub(r"```sql|```", "", raw_text).strip()
+        
+        return clean_text
 
     except Exception as e:
         logger.error(f"LLM Generation failed: {e}", exc_info=True)
-        raise
+        return "ERROR"
+
+async def format_data_to_natural_language(user_question: str, db_result: list) -> str:
+    
+    try:
+        prompt = f"""
+        Role: You are a friendly Sales Expert.
+        Task: Read the user's question and the raw database result, then provide a friendly, easy-to-understand conversational answer using ONLY the provided data.
+        
+        Rules:
+        - Reply in the SAME LANGUAGE as the user's question (Arabic or English).
+        - Do NOT mention "database", "SQL", "query", or "JSON".
+        - Example: If the data says {{"product_name": "iPhone", "total_sales": 5000}}, say "أفضل منتج مبيعاً هو الآيفون بمبيعات إجمالية بلغت 5000" or "The top selling product is iPhone with 5,000 in sales."
+        - Keep it professional and concise.
+
+        User Question: {user_question}
+        Raw Database Result: {json.dumps(db_result, ensure_ascii=False)}
+        
+        Natural Answer:"""
+        
+        response = await model.generate_content_async(prompt)
+        if not response or not response.text:
+            return "Here are your results based on the data."
+            
+        return response.text.strip()
+        
+    except Exception as e:
+        logger.error(f"Formatting failed: {e}", exc_info=True)
+        return "إليك البيانات التي طلبتها." 

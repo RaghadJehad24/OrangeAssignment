@@ -15,43 +15,40 @@ def call_backend(question):
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        if message["role"] == "user":
-            st.markdown(message["content"])
-        else:
-            st.markdown(message["content"])
+        st.markdown(message["content"])
+        if message.get("sql"):
+            with st.expander("🔍 View Database Query (For Debugging)"):
+                st.code(message["sql"], language="sql")
 
 if prompt := st.chat_input("E.g., What is the average order value?"):
 
     st.session_state.messages.append({"role": "user", "content": prompt})
-
     with st.chat_message("user"):
         st.markdown(prompt)
 
     try:
         with st.spinner("Searching the Data Warehouse..."):
-            print("Sending:", prompt)
-
             response = call_backend(prompt)
 
             if response.status_code == 200:
                 data = response.json()
 
-                answer = data.get("result")
-                generated_sql = data.get("sql") 
+                bot_message = data.get("message", "عذراً، لم أتمكن من استخراج الرد.")
+                sql_used = data.get("sql") 
 
                 with st.chat_message("assistant"):
-                    st.markdown("### 📊 Answer")
-                    st.write(answer)
-
-                    st.markdown("### 🧠 Generated SQL")
-                    st.code(generated_sql, language="sql")
+                    st.markdown(bot_message)
+                    
+                    if sql_used:
+                        with st.expander("🔍 View Database Query (For Debugging)"):
+                            st.code(sql_used, language="sql")
 
                 st.session_state.messages.append({
                     "role": "assistant",
-                    "content": f"### 📊 Answer\n{answer}\n\n### 🧠 Generated SQL\n```sql\n{generated_sql}\n```"
+                    "content": bot_message,
+                    "sql": sql_used
                 })
 
             else:

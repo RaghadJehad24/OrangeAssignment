@@ -8,11 +8,9 @@ logger = logging.getLogger(__name__)
 
 BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "retail-data-lake")
 FILE_NAME = "sales.csv"
-
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FILE_PATH = os.path.join(BASE_DIR, FILE_NAME)
+FILE_PATH = os.path.join(BASE_DIR, "data", FILE_NAME)
 S3_KEY = f"raw-data/{FILE_NAME}"
-
 s3_client = boto3.client(
     "s3",
     endpoint_url=os.getenv("S3_ENDPOINT", "http://localstack:4566"),
@@ -22,7 +20,7 @@ s3_client = boto3.client(
 )
 
 def upload_to_datalake():
-    if not os.path.exists(FILE_PATH):
+    if not os.path.isfile(FILE_PATH):
         logger.error(f"❌ File not found at path: {FILE_PATH}")
         return
 

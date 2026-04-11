@@ -17,13 +17,13 @@ A complete, end-to-end data engineering and AI solution that translates natural 
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
-│                     STREAMLIT UI (Port 8501)                │
+│                    STREAMLIT UI (Port 8501)                 │
 │              Chat Interface for Natural Language            │
 └────────────────────────┬────────────────────────────────────┘
                          │ HTTP POST Request
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                   FASTAPI BACKEND (Port 8000)               │
+│                  FASTAPI BACKEND (Port 8000)                │
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │ 1. Receive User Query (English/Arabic)               │   │
 │  │ 2. Send context to LLM → Generate SQL                │   │
@@ -50,7 +50,7 @@ A complete, end-to-end data engineering and AI solution that translates natural 
 
 ┌─────────────────────────────────────────────────────────────┐
 │              LocalStack (S3 Emulator - Port 4566)           │
-│  ├── /raw-data/sales.csv  ← Raw Data File                   │
+│  ├── /data/sales.csv      ← Raw Data File                   │
 │  └── retail-data-lake bucket                                │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -74,33 +74,31 @@ A complete, end-to-end data engineering and AI solution that translates natural 
    - ✅ Enforces a `LIMIT` clause to prevent data dumps.
 6. The safe SQL query is executed on **Postgres** with a 5-second statement timeout.
 7. Results are mapped to a JSON array.
-8. **Streamlit** renders the final answer alongside the generated SQL code block.
+8. **Streamlit** renders the final answer alongside the generated SQL code block (hidden in an expander for debugging).
 
 ---
 
-## 🚀 Setup & Installation (Step-by-Step)
+## 🚀 Setup & Installation (1-Click Start)
 
 ### Prerequisites:
 
 - Docker & Docker Compose
 - Gemini API Key (Free from Google AI Studio)
-- Terminal / Bash
+- Terminal / Bash / PowerShell
 
 ### 1. Clone & Configure Environment
 
 ```bash
-# 1. Clone the repository
 git clone <repo_url>
 cd OrangeAssignment
 
-# 2. Create the .env file
 cat > .env << EOF
 # Gemini API
 GEMINI_API_KEY=your_actual_api_key_here
 
-# Database
-DB_USER=admin
-DB_PASSWORD=admin123
+# Local Database Credentials (Set your own dummy values for local run)
+DB_USER=your_local_db_user
+DB_PASSWORD=your_local_db_password
 DB_NAME=sales_dwh
 DB_HOST=postgres
 DB_PORT=5432
@@ -112,38 +110,30 @@ S3_BUCKET_NAME=retail-data-lake
 # Backend
 API_URL=http://backend:8000
 EOF
-
-# 3. Ensure sales.csv is in the root directory
-ls -la sales.csv
 ```
 
-### 2. Build & Spin Up Containers
+_Note: Ensure the `sales.csv` file is placed inside the `data/` directory before running the system._
+
+### 2. Run the Project
+
+Choose the startup script based on your Operating System. This script will automatically build the images, spin up the containers, provision LocalStack S3, and run the ETL pipeline.
+
+**For Linux / macOS / Git Bash:**
 
 ```bash
-# Build images and start detached containers
-docker-compose up -d --build
-
-# Verify status (all should be Up/Healthy)
-docker-compose ps
+chmod +x start.sh
+./start.sh
 ```
 
-### 3. Data Initialization (S3 Provisioning & ETL)
+**For Windows (CMD / PowerShell):**
 
-```bash
-# Wait ~10 seconds for DB and LocalStack to be fully ready
-sleep 10
-
-# 1. Provision S3 Bucket and upload raw data
-docker-compose exec backend python infrastructure/init_s3.py
-
-# 2. Run the Medallion ETL Pipeline (Bronze -> Silver -> Gold)
-docker-compose exec backend python data_pipeline/etl_script.py
-
-# 3. Verify DWH ingestion
-docker-compose exec postgres psql -U admin -d sales_dwh -c "SELECT COUNT(*) FROM fact_sales;"
+```powershell
+.\start.bat
 ```
 
-### 4. Access the Application
+_(Or simply double-click `start.bat` from your File Explorer)._
+
+### 3. Access the Application
 
 - **Frontend UI (Streamlit):** [http://localhost:8501](http://localhost:8501)
 - **API Docs (Swagger):** [http://localhost:8000/docs](http://localhost:8000/docs)
@@ -188,10 +178,11 @@ ORDER BY month;
 ## 🔒 Security Measures
 
 1. **SQL Injection Prevention:** Used `SQLAlchemy` parameterized execution options where applicable.
-2. **Statement Timeout:** `connection.execute(text("SET statement_timeout = 5000;"))` limits execution to 5 seconds.
+2. **Statement Timeout:** `connection.execute(text("SET statement_timeout = 5000;"))` limits execution to 5 seconds to prevent DB lockups.
 3. **Keyword Blacklist:** Regex blocks destructive operations (`DROP`, `ALTER`, `TRUNCATE`, etc.).
 4. **Structure Enforcement:** Only permits queries starting with `SELECT` or `WITH`.
-5. **LIMIT Enforcement:** Automatically appends `LIMIT 100` if omitted by the LLM.
+5. **LIMIT Enforcement:** Automatically appends `LIMIT 50` if omitted by the LLM.
+6. **Database-Level Read-Only Role (Pro Tip):** In a strict production environment, the database connection string would use a dedicated Read-Only user role, enforcing safety at the database engine level alongside application-level regex filters.
 
 ---
 
@@ -214,11 +205,13 @@ Utilizes **Surrogate Keys** linking to dimensions, optimized for heavy aggregati
 ## 🛠️ Troubleshooting
 
 - **Backend cannot connect to Database:**
-  Run `docker-compose logs postgres` or manually test via `docker-compose exec postgres psql -U admin -d sales_dwh`.
+  Run `docker-compose logs postgres` or manually test via `docker-compose exec postgres psql -U <your_db_user> -d sales_dwh`.
 - **Frontend cannot reach Backend:**
   Ensure they share the same Docker network. Test with `docker-compose exec frontend curl http://backend:8000/`.
 - **LLM Fails to generate SQL:**
   Verify your API key via `docker-compose exec backend echo $GEMINI_API_KEY`. A `429 Error` means you hit the free-tier rate limit; wait 60 seconds and retry.
+- **PowerShell Script Error (Windows):**
+  If `start.bat` is not recognized, ensure you prefix it with `.\` like this: `.\start.bat`.
 
 ---
 
@@ -244,9 +237,13 @@ Utilizes **Surrogate Keys** linking to dimensions, optimized for heavy aggregati
 ```text
 OrangeAssignment/
 ├── docker-compose.yml
-├── .env
-├── sales.csv
+├── .env.example        ← (Create this to show required env variables)
+├── start.sh            ← Linux/Mac Start Script
+├── start.bat           ← Windows Start Script
 ├── README.md
+│
+├── data/
+│   └── sales.csv                # Raw dataset
 │
 ├── backend/
 │   ├── main.py                  # FastAPI application
@@ -267,5 +264,4 @@ OrangeAssignment/
 │
 └── infrastructure/
     └── init_s3.py               # Boto3 script to provision LocalStack S3
-
 ```
