@@ -50,7 +50,7 @@ services:
     volumes:
       - ./infrastructure:/app/infrastructure
       - ./data_pipeline:/app/data_pipeline
-        - ./data/sales.csv:/app/data/sales.csv
+      - ./data:/app/data
     networks:
       - app-network
     depends_on:
