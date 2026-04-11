@@ -20,7 +20,7 @@ def is_sql_safe(sql_query: str) -> bool:
         r"\bUPDATE\b",
         r"\bINSERT\b",
         r"\bALTER\b",
-        r"\bTRUNCATE\b"
+        r"\bTRUNCATE\b",
         r"\bCREATE\b",    
         r"\bGRANT\b",     
         r"\bREVOKE\b",    
@@ -42,8 +42,8 @@ def validate_sql_structure(sql_query: str) -> bool:
 @app.post("/ask")
 async def ask_database(request: ChatRequest):
 
-    generated_sql = generate_sql_from_prompt(request.question)
 
+    generated_sql = generate_sql_from_prompt(request.question)
     if generated_sql == "ERROR":
         raise HTTPException(status_code=500, detail="LLM failed to generate query.")
 

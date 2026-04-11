@@ -68,14 +68,14 @@ LIMIT 5;
 """
 
 
-def generate_sql_from_prompt(user_question: str) -> str:
+async def generate_sql_from_prompt(user_question: str) -> str:
     try:
         if "SCHEMA_CONTEXT" not in globals():
             raise ValueError("SCHEMA_CONTEXT is not defined")
 
         prompt = f"{SCHEMA_CONTEXT}\n\nUser Question:\n{user_question}\n\nSQL:"
 
-        response = model.generate_content(prompt)
+        response = await model.generate_content_async(prompt)
 
         if not response or not response.text:
             raise ValueError("Empty response from LLM")

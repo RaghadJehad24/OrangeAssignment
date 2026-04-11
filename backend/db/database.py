@@ -11,7 +11,6 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "admin123")
 DB_NAME = os.getenv("DB_NAME", "sales_dwh")
 
 DB_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-# DB_URL = os.getenv("DB_HOST_URL", "postgresql://admin:admin123@postgres:5432/sales_dwh")
 
 engine = create_engine(
     DB_URL,
@@ -24,8 +23,6 @@ engine = create_engine(
 
  
 def execute_safe_query(sql_query: str):
-    """Execute SQL safely with timeout + read-only enforcement"""
-
     try:
         with engine.connect() as connection:
             connection = connection.execution_options(
